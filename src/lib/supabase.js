@@ -9,7 +9,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Fungsi untuk mengambil semua film
 export const fetchMovies = async () => {
   try {
     const { data, error } = await supabase
@@ -25,7 +24,6 @@ export const fetchMovies = async () => {
   }
 };
 
-// Fungsi untuk mengambil semua buku
 export const fetchBooks = async () => {
   try {
     const { data, error } = await supabase
@@ -41,7 +39,6 @@ export const fetchBooks = async () => {
   }
 };
 
-// Fungsi untuk mengambil film berdasarkan ID
 export const fetchMovieById = async (id) => {
   try {
     const { data, error } = await supabase
@@ -58,7 +55,6 @@ export const fetchMovieById = async (id) => {
   }
 };
 
-// Fungsi untuk mengambil buku berdasarkan ID
 export const fetchBookById = async (id) => {
   try {
     const { data, error } = await supabase
