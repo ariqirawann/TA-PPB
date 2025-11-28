@@ -1,4 +1,6 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 * {
   margin: 0;
@@ -16,7 +18,6 @@ body {
   color: #ffffff;
 }
 
-/* Styling untuk scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -35,7 +36,6 @@ body {
   background: #6b7280;
 }
 
-/* Hide scrollbar untuk mobile pada overflow-x-auto */
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -45,7 +45,6 @@ body {
   display: none;
 }
 
-/* Line clamp utility */
 .line-clamp-1 {
   overflow: hidden;
   display: -webkit-box;
@@ -60,17 +59,14 @@ body {
   -webkit-line-clamp: 2;
 }
 
-/* Safe area untuk iOS devices */
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* Smooth scroll */
 html {
   scroll-behavior: smooth;
 }
 
-/* Disable text selection on buttons */
 button {
   -webkit-tap-highlight-color: transparent;
   user-select: none;
