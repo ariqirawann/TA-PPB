@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Home, Film, Book, Heart, User, Star, ChevronLeft, ChevronRight, Loader, Clock, FileText } from 'lucide-react';
+import { Search, Home, Film, Book, Heart, User, Star, ChevronLeft, ChevronRight, Loader, Clock, FileText, ChevronDown, ChevronUp } from 'lucide-react';
 import { fetchMovies, fetchBooks } from './lib/supabase';
 
-// Komponen Bottom Navigation
 const BottomNav = ({ currentPage, setCurrentPage }) => {
   const navItems = [
     { id: 'home', icon: Home, label: 'Beranda' },
@@ -35,7 +34,6 @@ const BottomNav = ({ currentPage, setCurrentPage }) => {
   );
 };
 
-// Komponen Card untuk Film/Buku
 const MediaCard = ({ item, type, onToggleFavorite, isFavorite, onClick }) => {
   return (
     <div 
@@ -80,7 +78,6 @@ const MediaCard = ({ item, type, onToggleFavorite, isFavorite, onClick }) => {
   );
 };
 
-// Komponen Pagination
 const Pagination = ({ currentPage, totalPages, onPageChange }) => {
   return (
     <div className="flex items-center justify-center gap-4 my-8">
@@ -105,14 +102,19 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
   );
 };
 
-// Komponen Detail Modal
 const DetailModal = ({ item, type, onClose }) => {
   if (!item) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-gray-900 rounded-lg max-w-4xl w-full my-8">
-        <div className="relative h-96">
+    <div 
+      className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 overflow-y-auto"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-gray-900 rounded-lg max-w-4xl w-full my-8 max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="relative h-64 md:h-96">
           <img 
             src={item.image_url || 'https://via.placeholder.com/300x450?text=No+Image'} 
             alt={item.title}
@@ -120,9 +122,9 @@ const DetailModal = ({ item, type, onClose }) => {
           />
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 bg-black/50 text-white px-4 py-2 rounded-lg hover:bg-black/70 transition-colors"
+            className="absolute top-4 right-4 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors font-semibold shadow-lg z-10"
           >
-            Tutup
+            ✕ Tutup
           </button>
         </div>
         <div className="p-6">
@@ -134,7 +136,7 @@ const DetailModal = ({ item, type, onClose }) => {
               <div className="flex items-center gap-2">
                 <Star size={20} className="text-yellow-500 fill-yellow-500" />
                 <span className="text-white text-2xl font-bold">{item.rating || 'N/A'}</span>
-                <span className="text-gray-400">/10</span>
+                <span className="text-gray-400">/{type === 'movie' ? '10' : '5'}</span>
               </div>
             </div>
             
@@ -186,29 +188,40 @@ const DetailModal = ({ item, type, onClose }) => {
   );
 };
 
-// Loading Component
 const LoadingSpinner = () => (
   <div className="flex items-center justify-center py-12">
     <Loader className="animate-spin text-blue-500" size={48} />
   </div>
 );
 
-// Main App Component
 export default function App() {
   const [currentPage, setCurrentPage] = useState('home');
   const [movies, setMovies] = useState([]);
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [favorites, setFavorites] = useState({ movies: [], books: [] });
+  const [favorites, setFavorites] = useState(() => {
+    try {
+      const saved = localStorage.getItem('mediashelf_favorites');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        console.log('✅ Favorites loaded from localStorage:', parsed);
+        return parsed;
+      }
+    } catch (error) {
+      console.error('❌ Error loading favorites:', error);
+    }
+    console.log('ℹ️ No saved favorites, using default');
+    return { movies: [], books: [] };
+  });
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGenre, setSelectedGenre] = useState('all');
   const [currentMoviePage, setCurrentMoviePage] = useState(1);
   const [currentBookPage, setCurrentBookPage] = useState(1);
   const [selectedItem, setSelectedItem] = useState(null);
   const [selectedType, setSelectedType] = useState(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const itemsPerPage = 3;
 
-  // Load data dari Supabase
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
@@ -222,30 +235,33 @@ export default function App() {
     };
 
     loadData();
-
-    // Load favorites dari localStorage
-    const savedFavorites = localStorage.getItem('favorites');
-    if (savedFavorites) {
-      setFavorites(JSON.parse(savedFavorites));
-    }
   }, []);
 
-  // Save favorites ke localStorage
   useEffect(() => {
-    localStorage.setItem('favorites', JSON.stringify(favorites));
+    try {
+      localStorage.setItem('mediashelf_favorites', JSON.stringify(favorites));
+      console.log('💾 Favorites saved to localStorage:', favorites);
+    } catch (error) {
+      console.error('❌ Error saving favorites:', error);
+    }
   }, [favorites]);
 
   const toggleFavorite = (id, type) => {
+    console.log('🔄 Toggling favorite:', { id, type });
+    
     setFavorites(prev => {
       const key = type === 'movie' ? 'movies' : 'books';
       const isFavorite = prev[key].includes(id);
       
-      return {
+      const newFavorites = {
         ...prev,
         [key]: isFavorite 
           ? prev[key].filter(fId => fId !== id)
           : [...prev[key], id]
       };
+      
+      console.log('📝 New favorites state:', newFavorites);
+      return newFavorites;
     });
   };
 
@@ -269,7 +285,7 @@ export default function App() {
 
   const renderHome = () => (
     <div className="pb-20">
-      <div className="bg-linear-to-r from-blue-600 to-purple-600 p-8 rounded-lg mb-8">
+      <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-8 rounded-lg mb-8">
         <h1 className="text-4xl font-bold text-white mb-2">MediaShelf Archive</h1>
         <p className="text-white/90">Jelajahi koleksi film dan buku favorit Anda</p>
       </div>
@@ -496,6 +512,54 @@ export default function App() {
             <p className="text-gray-400 text-sm">
               MediaShelf Archive adalah aplikasi web progresif untuk menjelajahi dan mengelola koleksi film dan buku favorit Anda dengan fitur lengkap.
             </p>
+          </div>
+
+          <div className="mt-6 border border-gray-700 rounded-lg overflow-hidden">
+            <button
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="w-full bg-gray-900 hover:bg-gray-800 p-4 flex items-center justify-between transition-colors"
+            >
+              <span className="text-white font-semibold">🔧 Advanced</span>
+              {showAdvanced ? (
+                <ChevronUp className="text-gray-400" size={20} />
+              ) : (
+                <ChevronDown className="text-gray-400" size={20} />
+              )}
+            </button>
+            
+            {showAdvanced && (
+              <div className="p-4 bg-blue-900/20 border-t border-gray-700">
+                <h3 className="text-blue-300 font-semibold mb-3 text-sm">Debug Information</h3>
+                <div className="space-y-2 text-sm">
+                  <button
+                    onClick={() => {
+                      const saved = localStorage.getItem('mediashelf_favorites');
+                      console.log('📦 LocalStorage raw data:', saved);
+                      console.log('📦 Parsed data:', saved ? JSON.parse(saved) : null);
+                      alert('Check browser console (F12) for localStorage data');
+                    }}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-colors text-sm"
+                  >
+                    Check localStorage
+                  </button>
+                  <button
+                    onClick={() => {
+                      localStorage.removeItem('mediashelf_favorites');
+                      setFavorites({ movies: [], books: [] });
+                      console.log('🗑️ Favorites cleared from localStorage');
+                      alert('All favorites cleared! Refresh page to see effect.');
+                    }}
+                    className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded transition-colors text-sm"
+                  >
+                    Clear All Favorites
+                  </button>
+                  <div className="bg-gray-900 p-3 rounded text-gray-300 font-mono text-xs overflow-x-auto">
+                    <p className="text-gray-500 mb-1">Current State:</p>
+                    <pre>{JSON.stringify(favorites, null, 2)}</pre>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
