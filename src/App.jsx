@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Home, Film, Book, Heart, User, Star, ChevronLeft, ChevronRight, Loader, Clock, FileText, ChevronDown, ChevronUp } from 'lucide-react';
-import { fetchMovies, fetchBooks } from './lib/supabase';
+import { Search, Home, Film, Book, Heart, User, Star, ChevronLeft, ChevronRight, Loader, Clock, FileText, ChevronDown, ChevronUp, Send, Shield, LogOut } from 'lucide-react';
+import { fetchMovies, fetchBooks, fetchMovieReviews, fetchBookReviews, addMovieReview, addBookReview, login } from './lib/supabase';
+import { AdminPanel } from './components/AdminPanel';
 
-const BottomNav = ({ currentPage, setCurrentPage }) => {
+const BottomNav = ({ currentPage, setCurrentPage, userRole, onAdminClick, onLogout }) => {
   const navItems = [
     { id: 'home', icon: Home, label: 'Beranda' },
     { id: 'movies', icon: Film, label: 'Film' },
@@ -29,6 +30,26 @@ const BottomNav = ({ currentPage, setCurrentPage }) => {
             </button>
           );
         })}
+        
+        {userRole === 'admin' ? (
+          <button
+            onClick={onAdminClick}
+            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
+              currentPage === 'admin' ? 'text-red-500' : 'text-gray-400'
+            }`}
+          >
+            <Shield size={24} />
+            <span className="text-xs mt-1">Admin</span>
+          </button>
+        ) : (
+          <button
+            onClick={onLogout}
+            className="flex flex-col items-center justify-center flex-1 h-full transition-colors text-gray-400 hover:text-red-500"
+          >
+            <LogOut size={24} />
+            <span className="text-xs mt-1">Logout</span>
+          </button>
+        )}
       </div>
     </nav>
   );
@@ -102,7 +123,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
   );
 };
 
-const DetailModal = ({ item, type, onClose }) => {
+const DetailModal = ({ item, type, onClose, reviews, onReviewAdded }) => {
   if (!item) return null;
 
   return (
@@ -177,11 +198,51 @@ const DetailModal = ({ item, type, onClose }) => {
           </div>
           
           {item.description && (
-            <div className="bg-gray-800 p-4 rounded-lg">
+            <div className="bg-gray-800 p-4 rounded-lg mb-6">
               <h3 className="text-white font-semibold text-lg mb-2">Deskripsi</h3>
               <p className="text-gray-300 leading-relaxed">{item.description}</p>
             </div>
           )}
+
+          <div className="bg-gray-800 p-4 rounded-lg mb-4">
+            <h3 className="text-white font-semibold text-lg mb-4">
+              User Reviews ({reviews.length})
+            </h3>
+            
+            <ReviewForm 
+              itemId={item.id} 
+              type={type} 
+              onReviewAdded={onReviewAdded}
+            />
+
+            <div className="mt-4 space-y-3 max-h-96 overflow-y-auto">
+              {reviews.length === 0 ? (
+                <p className="text-gray-500 text-center py-4">Belum ada review. Jadilah yang pertama!</p>
+              ) : (
+                reviews.map((review) => (
+                  <div key={review.id} className="bg-gray-700 p-3 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-white font-semibold text-sm">{review.user_name}</span>
+                      <div className="flex items-center gap-1">
+                        <Star size={14} className="text-yellow-500 fill-yellow-500" />
+                        <span className="text-yellow-500 font-semibold text-sm">
+                          {review.rating}/{type === 'movie' ? '10' : '5'}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-gray-300 text-sm leading-relaxed">{review.review_text}</p>
+                    <p className="text-gray-500 text-xs mt-2">
+                      {new Date(review.created_at).toLocaleDateString('id-ID', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -194,7 +255,199 @@ const LoadingSpinner = () => (
   </div>
 );
 
+const LoginScreen = ({ onLogin }) => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    
+    const result = await login(username, password);
+    
+    if (result.success) {
+      onLogin(result.user, result.role);
+    } else {
+      setError(result.error);
+    }
+    
+    setLoading(false);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-blue-950 to-gray-950 flex items-center justify-center p-4">
+      <div className="max-w-md w-full">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-600 rounded-full mb-4">
+            <Book size={40} className="text-white" />
+          </div>
+          <h1 className="text-4xl font-bold text-white mb-2">MediaShelf Archive</h1>
+          <p className="text-gray-400">Jelajahi koleksi film dan buku favorit Anda</p>
+        </div>
+
+        <div className="bg-gray-900/80 backdrop-blur-sm rounded-2xl p-8 shadow-2xl border border-gray-800">
+          <h2 className="text-2xl font-bold text-white mb-6 text-center">Login</h2>
+          
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-gray-400 text-sm mb-2">Username</label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Masukkan username"
+                className="w-full px-4 py-3 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-blue-500 focus:outline-none transition-colors"
+                required
+                autoFocus
+              />
+            </div>
+            
+            <div>
+              <label className="block text-gray-400 text-sm mb-2">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Masukkan password"
+                className="w-full px-4 py-3 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-blue-500 focus:outline-none transition-colors"
+                required
+              />
+            </div>
+
+            {error && (
+              <div className="bg-red-500/10 border border-red-500 text-red-500 px-4 py-3 rounded-lg text-sm">
+                {error}
+              </div>
+            )}
+            
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white px-4 py-3 rounded-lg transition-colors font-semibold flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <Loader className="animate-spin" size={20} />
+                  Loading...
+                </>
+              ) : (
+                'Login'
+              )}
+            </button>
+          </form>
+
+          <div className="mt-6 pt-6 border-t border-gray-800">
+            <p className="text-gray-500 text-xs mb-3 text-center">Demo Credentials:</p>
+            <div className="space-y-2 text-xs">
+              <div className="bg-gray-800/50 p-3 rounded-lg">
+                <p className="text-gray-400 mb-1">👑 <span className="font-semibold text-yellow-500">Admin:</span></p>
+                <p className="text-gray-300">Username: <code className="bg-gray-950 px-2 py-1 rounded">admin</code></p>
+                <p className="text-gray-300">Password: <code className="bg-gray-950 px-2 py-1 rounded">admin123</code></p>
+              </div>
+              <div className="bg-gray-800/50 p-3 rounded-lg">
+                <p className="text-gray-400 mb-1">👤 <span className="font-semibold text-blue-500">User:</span></p>
+                <p className="text-gray-300">Username: <code className="bg-gray-950 px-2 py-1 rounded">ariqirawan</code></p>
+                <p className="text-gray-300">Password: <code className="bg-gray-950 px-2 py-1 rounded">user123</code></p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p className="text-center text-gray-500 text-sm mt-6">
+          © 2024 MediaShelf Archive. All rights reserved.
+        </p>
+      </div>
+    </div>
+  );
+};
+
+const ReviewForm = ({ itemId, type, onReviewAdded }) => {
+  const [userName, setUserName] = useState('');
+  const [rating, setRating] = useState('');
+  const [reviewText, setReviewText] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const maxRating = type === 'movie' ? 10 : 5;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+
+    const reviewData = {
+      [`${type}_id`]: itemId,
+      user_name: userName,
+      rating: parseFloat(rating),
+      review_text: reviewText
+    };
+
+    const result = type === 'movie'
+      ? await addMovieReview(reviewData)
+      : await addBookReview(reviewData);
+
+    if (result.success) {
+      setUserName('');
+      setRating('');
+      setReviewText('');
+      onReviewAdded();
+      alert('Review berhasil ditambahkan!');
+    } else {
+      alert('Error: ' + result.error);
+    }
+
+    setSubmitting(false);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="bg-gray-800 p-4 rounded-lg">
+      <h3 className="text-white font-semibold mb-3">Tulis Review Anda</h3>
+      <div className="space-y-3">
+        <input
+          type="text"
+          placeholder="Nama Anda"
+          value={userName}
+          onChange={(e) => setUserName(e.target.value)}
+          className="w-full px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none text-sm"
+          required
+        />
+        <input
+          type="number"
+          step="0.1"
+          min="0"
+          max={maxRating}
+          placeholder={`Rating (0-${maxRating})`}
+          value={rating}
+          onChange={(e) => setRating(e.target.value)}
+          className="w-full px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none text-sm"
+          required
+        />
+        <textarea
+          placeholder="Tulis review Anda..."
+          value={reviewText}
+          onChange={(e) => setReviewText(e.target.value)}
+          rows="3"
+          className="w-full px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none text-sm"
+          required
+        />
+        <button
+          type="submit"
+          disabled={submitting}
+          className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white px-4 py-2 rounded transition-colors flex items-center justify-center gap-2 text-sm"
+        >
+          <Send size={16} />
+          {submitting ? 'Mengirim...' : 'Kirim Review'}
+        </button>
+      </div>
+    </form>
+  );
+};
+
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userRole, setUserRole] = useState(null); 
+  const [currentUser, setCurrentUser] = useState(null);
   const [currentPage, setCurrentPage] = useState('home');
   const [movies, setMovies] = useState([]);
   const [books, setBooks] = useState([]);
@@ -220,22 +473,26 @@ export default function App() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [selectedType, setSelectedType] = useState(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [reviews, setReviews] = useState([]);
+  const [isAdmin, setIsAdmin] = useState(false);
   const itemsPerPage = 3;
 
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      const [moviesData, booksData] = await Promise.all([
-        fetchMovies(),
-        fetchBooks()
-      ]);
-      setMovies(moviesData);
-      setBooks(booksData);
-      setLoading(false);
-    };
+    if (isAuthenticated) {
+      const loadData = async () => {
+        setLoading(true);
+        const [moviesData, booksData] = await Promise.all([
+          fetchMovies(),
+          fetchBooks()
+        ]);
+        setMovies(moviesData);
+        setBooks(booksData);
+        setLoading(false);
+      };
 
-    loadData();
-  }, []);
+      loadData();
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     try {
@@ -263,6 +520,70 @@ export default function App() {
       console.log('📝 New favorites state:', newFavorites);
       return newFavorites;
     });
+  };
+
+  const loadReviews = async (itemId, type) => {
+    const data = type === 'movie'
+      ? await fetchMovieReviews(itemId)
+      : await fetchBookReviews(itemId);
+    setReviews(data);
+  };
+
+  const handleItemClick = async (item, type) => {
+    setSelectedItem(item);
+    setSelectedType(type);
+    await loadReviews(item.id, type);
+  };
+
+  const handleReviewAdded = async () => {
+    if (selectedItem && selectedType) {
+      await loadReviews(selectedItem.id, selectedType);
+    }
+  };
+
+  const handleLogin = async (user, role) => {
+    setCurrentUser(user);
+    setUserRole(role);
+    setIsAuthenticated(true);
+    setIsAdmin(role === 'admin');
+    
+    await refreshData();
+    
+    console.log(`✅ Login successful as ${role}:`, user.username);
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setUserRole(null);
+    setCurrentUser(null);
+    setIsAdmin(false);
+    setCurrentPage('home');
+    console.log('👋 Logged out');
+  };
+
+  const handleAdminClick = () => {
+    setCurrentPage('admin');
+  };
+
+  const refreshData = async () => {
+    setLoading(true);
+    const [moviesData, booksData] = await Promise.all([
+      fetchMovies(),
+      fetchBooks()
+    ]);
+    setMovies(moviesData);
+    setBooks(booksData);
+    setLoading(false);
+    
+    if (selectedItem && selectedType) {
+      const updatedItem = selectedType === 'movie' 
+        ? moviesData.find(m => m.id === selectedItem.id)
+        : booksData.find(b => b.id === selectedItem.id);
+      
+      if (updatedItem) {
+        setSelectedItem(updatedItem);
+      }
+    }
   };
 
   const filterItems = (items, type) => {
@@ -304,10 +625,7 @@ export default function App() {
                   type="movie"
                   onToggleFavorite={toggleFavorite}
                   isFavorite={favorites.movies.includes(movie.id)}
-                  onClick={() => {
-                    setSelectedItem(movie);
-                    setSelectedType('movie');
-                  }}
+                  onClick={() => handleItemClick(movie, 'movie')}
                 />
               ))}
             </div>
@@ -323,10 +641,7 @@ export default function App() {
                   type="book"
                   onToggleFavorite={toggleFavorite}
                   isFavorite={favorites.books.includes(book.id)}
-                  onClick={() => {
-                    setSelectedItem(book);
-                    setSelectedType('book');
-                  }}
+                  onClick={() => handleItemClick(book, 'book')}
                 />
               ))}
             </div>
@@ -392,10 +707,7 @@ export default function App() {
                   type={type}
                   onToggleFavorite={toggleFavorite}
                   isFavorite={type === 'movie' ? favorites.movies.includes(item.id) : favorites.books.includes(item.id)}
-                  onClick={() => {
-                    setSelectedItem(item);
-                    setSelectedType(type);
-                  }}
+                  onClick={() => handleItemClick(item, type)}
                 />
               ))}
             </div>
@@ -567,27 +879,50 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        {currentPage === 'home' && renderHome()}
-        {currentPage === 'movies' && renderCatalog(movies, 'movie', currentMoviePage, setCurrentMoviePage)}
-        {currentPage === 'books' && renderCatalog(books, 'book', currentBookPage, setCurrentBookPage)}
-        {currentPage === 'favorites' && renderFavorites()}
-        {currentPage === 'profile' && renderProfile()}
-      </div>
+    <>
+      {!isAuthenticated ? (
+        <LoginScreen onLogin={handleLogin} />
+      ) : (
+        <div className="min-h-screen bg-gray-950 text-white">
+          <div className="max-w-7xl mx-auto px-4 py-6">
+            {currentPage === 'home' && renderHome()}
+            {currentPage === 'movies' && renderCatalog(movies, 'movie', currentMoviePage, setCurrentMoviePage)}
+            {currentPage === 'books' && renderCatalog(books, 'book', currentBookPage, setCurrentBookPage)}
+            {currentPage === 'favorites' && renderFavorites()}
+            {currentPage === 'profile' && renderProfile()}
+            {currentPage === 'admin' && isAdmin && (
+              <AdminPanel 
+                movies={movies}
+                books={books}
+                onUpdate={refreshData}
+                onLogout={handleLogout}
+              />
+            )}
+          </div>
 
-      <BottomNav currentPage={currentPage} setCurrentPage={setCurrentPage} />
-      
-      {selectedItem && (
-        <DetailModal
-          item={selectedItem}
-          type={selectedType}
-          onClose={() => {
-            setSelectedItem(null);
-            setSelectedType(null);
-          }}
-        />
+          <BottomNav 
+            currentPage={currentPage} 
+            setCurrentPage={setCurrentPage}
+            userRole={userRole}
+            onAdminClick={handleAdminClick}
+            onLogout={handleLogout}
+          />
+          
+          {selectedItem && (
+            <DetailModal
+              item={selectedItem}
+              type={selectedType}
+              reviews={reviews}
+              onReviewAdded={handleReviewAdded}
+              onClose={() => {
+                setSelectedItem(null);
+                setSelectedType(null);
+                setReviews([]);
+              }}
+            />
+          )}
+        </div>
       )}
-    </div>
+    </>
   );
 }
